@@ -1,0 +1,16 @@
+<?xml version="1.0" ?>
+<Image>
+	<FileName>2847267.jpg</FileName>
+	<Origin>plantnet</Origin>
+	<Date>2016-03-05</Date>
+	<Author>pepe sanchez tarrago</Author>
+	<Location>Sabadell</Location>
+	<Longitude>2.07675</Longitude>
+	<Latitude>41.56193</Latitude>
+	<Content>Leaf</Content>
+	<ObservationId>2779939</ObservationId>
+	<MediaId>2847267</MediaId>
+	<YearInCLEF>PlantCLEF2017</YearInCLEF>
+	<LearnTag>Test</LearnTag>
+	<ClassId>abc</ClassId>
+</Image>
