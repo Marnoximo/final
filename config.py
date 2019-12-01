@@ -15,3 +15,28 @@ sys.path.append("/home/tien/Works/DH/final/project/tf_slim/research/slim")
 # Config GPU for Tensorflow
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+
+
+class BaseConfig:
+    DEBUG = False
+    TESTING = False
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+    sys.path.append("/home/tien/Works/DH/final/project/tf_slim/research/slim")
+    os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+
+
+class DevelopmentConfig(BaseConfig):
+    DEBUG = False
+    ENV = 'development'
+    TESTING = True
+
+    DATABASE_URI = 'mysql+pymysql://admin:tienfinal@127.0.0.1/plantqt?charset=utf8mb4'
+
+
+class ProductionConfig(BaseConfig):
+    DEBUG = True
+    ENV = 'production'
+    TESTING = True
+
+    DATABASE_URI = ''

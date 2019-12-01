@@ -27,6 +27,8 @@ from modules.datasets import plantclef2017
 from modules.datasets import dataset_utils
 from nets import nets_factory
 from preprocessing import preprocessing_factory
+from PIL import Image
+import numpy as np
 slim = tf.contrib.slim
 
 tf.app.flags.DEFINE_integer(
@@ -114,13 +116,13 @@ def main(_):
     ##############################################################
     # Create a dataset provider that loads data from the dataset #
     ##############################################################
-    provider = slim.dataset_data_provider.DatasetDataProvider(
-        dataset,
-        shuffle=False,
-        common_queue_capacity=2 * FLAGS.batch_size,
-        common_queue_min=FLAGS.batch_size)
-    [image, label] = provider.get(['image', 'class_id'])
-    label -= FLAGS.labels_offset
+    # provider = slim.dataset_data_provider.DatasetDataProvider(
+    #     dataset,
+    #     shuffle=False,
+    #     common_queue_capacity=2 * FLAGS.batch_size,
+    #     common_queue_min=FLAGS.batch_size)
+    # [image, label] = provider.get(['image', 'class_id'])
+    # label -= FLAGS.labels_offset
 
     label_to_class_id = dataset_utils.read_label_file(FLAGS.checkpoint_path.split("model.ckpt")[0])
     keys = list(label_to_class_id.keys())
@@ -137,71 +139,101 @@ def main(_):
 
     eval_image_size = FLAGS.eval_image_size or network_fn.default_image_size
 
+    import numpy
+    from PIL import Image
+    p = '/home/tien/Works/DH/final/data/data_tien/plc_vnc/plc_vnc/421/151900.jpg'
+    # im = Image.open()
+    # im = numpy.array(im)
+    path = tf.placeholder(tf.string, name='my_string')
+    image = tf.io.read_file(path)
+    image = tf.image.decode_jpeg(image, channels=3)
+    # image = tf.expand_dims(image, 0)
+    label = 421
+    label = tf.expand_dims(label, 0)
+    label = tf.cast(label, tf.int64)
+    # image = tf.Print(image, [image])
+    # print(image)
+    # image = tf.placeholder(tf.float32, [None, None, 3], name='my_input')
     image = image_preprocessing_fn(image, eval_image_size, eval_image_size)
+    images = image
+    labels = label
+    # images, labels = tf.train.batch(
+    #     [image, label],
+    #     batch_size=FLAGS.batch_size,
+    #     num_threads=FLAGS.num_preprocessing_threads,
+    #     capacity=5 * FLAGS.batch_size)
 
-    images, labels = tf.train.batch(
-        [image, label],
-        batch_size=FLAGS.batch_size,
-        num_threads=FLAGS.num_preprocessing_threads,
-        capacity=5 * FLAGS.batch_size)
 
     labels = tf.map_fn(lambda x: label_table.lookup(x), labels)
-    ####################
-    # Define the model #
-    ####################
+    images = tf.expand_dims(images, 0)
     logits, _ = network_fn(images)
+    with tf.Session() as sess:
+        saver = tf.train.Saver()
+        saver.restore(sess, FLAGS.checkpoint_path)
+        logits = sess.run([logits], feed_dict={'my_string:0':p})
+        pred = numpy.argmax(logits[0][0])
+        print(pred)
+        print(label)
 
-    if FLAGS.quantize:
-      tf.contrib.quantize.create_eval_graph()
-
-    if FLAGS.moving_average_decay:
-      variable_averages = tf.train.ExponentialMovingAverage(
-          FLAGS.moving_average_decay, tf_global_step)
-      variables_to_restore = variable_averages.variables_to_restore(
-          slim.get_model_variables())
-      variables_to_restore[tf_global_step.op.name] = tf_global_step
-    else:
-      variables_to_restore = slim.get_variables_to_restore()
-
-    predictions = tf.argmax(logits, 1)
-    labels = tf.squeeze(labels)
-    # logits = tf.Print(logits, [logits])
-
-    # Define the metrics:
-    names_to_values, names_to_updates = slim.metrics.aggregate_metric_map({
-        'Accuracy': slim.metrics.streaming_accuracy(predictions, labels),
-        'Recall_5': slim.metrics.streaming_recall_at_k(
-            logits, labels, 5),
-    })
-
-    # Print the summaries to screen.
-    for name, value in names_to_values.items():
-      summary_name = 'eval/%s' % name
-      op = tf.summary.scalar(summary_name, value, collections=[])
-      op = tf.Print(op, [value], summary_name)
-      tf.add_to_collection(tf.GraphKeys.SUMMARIES, op)
-
-    # TODO(sguada) use num_epochs=1
-    if FLAGS.max_num_batches:
-      num_batches = FLAGS.max_num_batches
-    else:
-      # This ensures that we make a single pass over all of the data.
-      num_batches = math.ceil(dataset.num_samples / float(FLAGS.batch_size))
-
-    if tf.gfile.IsDirectory(FLAGS.checkpoint_path):
-      checkpoint_path = tf.train.latest_checkpoint(FLAGS.checkpoint_path)
-    else:
-      checkpoint_path = FLAGS.checkpoint_path
-
-    tf.logging.info('Evaluating %s' % checkpoint_path)
-
-    slim.evaluation.evaluate_once(
-        master=FLAGS.master,
-        checkpoint_path=checkpoint_path,
-        logdir=FLAGS.eval_dir,
-        num_evals=num_batches,
-        eval_op=list(names_to_updates.values()),
-        variables_to_restore=variables_to_restore)
+    # tf.reset_default_graph()
+    # ####################
+    # # Define the model #
+    # ####################
+    # logits, _ = network_fn(images)
+    #
+    # if FLAGS.quantize:
+    #   tf.contrib.quantize.create_eval_graph()
+    #
+    # if FLAGS.moving_average_decay:
+    #   variable_averages = tf.train.ExponentialMovingAverage(
+    #       FLAGS.moving_average_decay, tf_global_step)
+    #   variables_to_restore = variable_averages.variables_to_restore(
+    #       slim.get_model_variables())
+    #   variables_to_restore[tf_global_step.op.name] = tf_global_step
+    # else:
+    #   variables_to_restore = slim.get_variables_to_restore()
+    #
+    # predictions = tf.argmax(logits, 1)
+    # labels = tf.squeeze(labels)
+    # predictions = tf.Print(predictions, [predictions])
+    # labels = tf.Print(labels, [labels])
+    # # logits = tf.Print(logits, [logits])
+    #
+    # # Define the metrics:
+    # names_to_values, names_to_updates = slim.metrics.aggregate_metric_map({
+    #     'Accuracy': slim.metrics.streaming_accuracy(predictions, labels),
+    #     'Recall_5': slim.metrics.streaming_recall_at_k(
+    #         logits, labels, 5),
+    # })
+    #
+    # # Print the summaries to screen.
+    # for name, value in names_to_values.items():
+    #   summary_name = 'eval/%s' % name
+    #   op = tf.summary.scalar(summary_name, value, collections=[])
+    #   op = tf.Print(op, [value], summary_name)
+    #   tf.add_to_collection(tf.GraphKeys.SUMMARIES, op)
+    #
+    # # TODO(sguada) use num_epochs=1
+    # if FLAGS.max_num_batches:
+    #   num_batches = FLAGS.max_num_batches
+    # else:
+    #   # This ensures that we make a single pass over all of the data.
+    #   num_batches = math.ceil(dataset.num_samples / float(FLAGS.batch_size))
+    #
+    # if tf.gfile.IsDirectory(FLAGS.checkpoint_path):
+    #   checkpoint_path = tf.train.latest_checkpoint(FLAGS.checkpoint_path)
+    # else:
+    #   checkpoint_path = FLAGS.checkpoint_path
+    #
+    # tf.logging.info('Evaluating %s' % checkpoint_path)
+    #
+    # slim.evaluation.evaluate_once(
+    #     master=FLAGS.master,
+    #     checkpoint_path=checkpoint_path,
+    #     logdir=FLAGS.eval_dir,
+    #     num_evals=num_batches,
+    #     eval_op=list(names_to_updates.values()),
+    #     variables_to_restore=variables_to_restore)
 
 
 if __name__ == '__main__':

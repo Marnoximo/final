@@ -2,9 +2,32 @@ from scrapy import Request
 from scrapy.spiders import CrawlSpider
 from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import get_project_settings
+
 import json
 
+from config import DevelopmentConfig
+from modules.common.db.database import DBHelper, VNCSpecies
+
+
 data = []
+DBHelper().connect_database(DevelopmentConfig())
+
+
+def add_to_database(entry):
+    session = DBHelper().get_session()
+
+    obj = VNCSpecies.create(session, **{
+        'id': entry.get('id', ''),
+        'name': entry.get('name_vi'),
+        'species': entry.get('species', ''),
+        'classname': entry.get('class', ''),
+        'familyname': entry.get('family', ''),
+        'ordername': entry.get('order', ''),
+        'url': entry.get('url' '')
+    })
+
+    session.close()
+
 
 class VNCreatureSpider(CrawlSpider):
     name = 'vncreature'
@@ -41,8 +64,12 @@ class VNCreatureSpider(CrawlSpider):
                 else:
                     break
 
-            print(row_data)
-            data.append(row_data)
+            if row_data['url'] is not None and 'ID=' in row_data['url']:
+                row_data['id'] = row_data['url'].split('ID=')[-1]
+                add_to_database(row_data)
+
+                print(row_data)
+                data.append(row_data)
 
         next_page = response.xpath('//a[text()=">"]/@href').extract_first()
 
